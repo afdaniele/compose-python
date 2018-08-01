@@ -14,6 +14,7 @@ class Compose(object):
         self._app_secret = app_secret
         # get API info
         endpoints = self.endpoints()
+        if endpoints is None: return
         # parse info
         for endpoint in endpoints:
             service_name = endpoint['service']
@@ -24,8 +25,11 @@ class Compose(object):
             self.__dict__[service_name]._register_action(action_name, endpoint)
 
     def endpoints(self):
-        info = self._get('api', 'app_info')
-        return info['endpoints']
+        success, data, msg = self._get('api', 'app_info')
+        if not success:
+            print msg
+            return None
+        return data['endpoints']
 
     def _register_service(self, service_name):
         # create service proxy if it does not exist
@@ -35,12 +39,11 @@ class Compose(object):
     def _get(self, service, action, arguments={}):
         url = self._build_url(service, action, arguments)
         # call the RESTful API
-        response = requests.get(url)
-        data = response.json()
+        res = requests.get(url).json()
         # return result
-        if data['code'] == 200:
-            return data['data']
-        return None
+        if res['code'] == 200:
+            return True, res['data'], 'OK'
+        return False, res['message'], None
 
     def _build_url(self, service, action, arguments):
         return self._base_url % (
