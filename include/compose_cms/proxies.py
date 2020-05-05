@@ -6,7 +6,6 @@ from .exceptions import APIError
 
 
 class APINamespace(SimpleNamespace):
-
     def __init__(self, **kwargs):
         super(APINamespace, self).__init__(**kwargs)
 
@@ -17,15 +16,13 @@ class APINamespace(SimpleNamespace):
         if not item.startswith('__') and item not in self.__dict__:
             logger.error(
                 "API service '{}' not found. ".format(item) +
-                "Either such service does not exist or your API Application does not have access."
-            )
+                "Either such service does not exist or your API Application does not have access.")
             return ServiceProxy(None, item)
         # ---
         return super(APINamespace, self).__getattr__(item)
 
 
 class ServiceProxy(SimpleNamespace):
-
     def __init__(self, compose, service_name, **kwargs):
         self._compose = compose
         self._service_name = service_name
@@ -42,15 +39,13 @@ class ServiceProxy(SimpleNamespace):
         if not item.startswith('__') and item not in self.__dict__:
             logger.error(
                 "API action '{}/{}' not found. ".format(self._service_name, item) +
-                "Either such action does not exist or your API Application does not have access."
-            )
+                "Either such action does not exist or your API Application does not have access.")
             return ActionProxy(self, item, dict(), fake=True)
         # ---
         return super(ServiceProxy, self).__getattr__(item)
 
 
 class ActionProxy:
-
     def __init__(self, service, action_name, action_data, fake=False):
         self._service = service
         self._action_name = action_name

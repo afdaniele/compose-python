@@ -70,16 +70,9 @@ class Compose(object):
         return False, None, res['message']
 
     def _build_url(self, service, action, arguments=None, protocol=None):
-        return self._base_url % (
-            protocol if protocol else self._protocol,
-            self._hostname,
-            self._version,
-            service,
-            action,
-            self._app_id,
-            self._app_secret,
-            compile_query_string(arguments) if arguments else ''
-        )
+        return self._base_url % (protocol if protocol else self._protocol, self._hostname,
+                                 self._version, service, action, self._app_id, self._app_secret,
+                                 compile_query_string(arguments) if arguments else '')
 
     def _get_protocol(self):
         for proto in ['https', 'http']:

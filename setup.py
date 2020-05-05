@@ -31,14 +31,12 @@ description = """
 """.format(name=library_name, short=short_description, long=full_description, underline=underline)
 
 # setup package
-setup(
-    name=library_name,
-    author=maintainer,
-    author_email=maintainer_email,
-    url=library_webpage,
-    install_requires=dependencies,
-    package_dir={"": "include"},
-    packages=find_packages('./include'),
-    long_description=description,
-    version=version
-)
+setup(name=library_name,
+      author=maintainer,
+      author_email=maintainer_email,
+      url=library_webpage,
+      install_requires=dependencies,
+      package_dir={"": "include"},
+      packages=find_packages('./include'),
+      long_description=description,
+      version=version)
