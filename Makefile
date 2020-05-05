@@ -21,7 +21,7 @@ build:
 	python3 setup.py sdist
 
 clean:
-	rm -rf dist/ build/
+	rm -rf dist/ build/ compose_cms.egg-info/
 
 format:
 	yapf -r -i -p -vv ${ROOT_DIR}
