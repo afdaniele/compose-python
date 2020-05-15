@@ -10,17 +10,21 @@ class Compose(object):
     _base_url = "%s://%s/web-api/%s/%s/%s/json?app_id=%s&app_secret=%s&%s"
     _services = []
 
-    def __init__(self, host, app_id, app_secret, version='1.0'):
+    def __init__(self, host, app_id, app_secret, version='1.0', protocol='auto', interactive=False):
         self._hostname = host[:-1] if host[-1] == '/' else host
         self._version = version
         self._app_id = app_id
         self._app_secret = app_secret
         # create API namespace
-        self.api = APINamespace()
+        self.api = APINamespace(self)
+        # check protocol value
+        if protocol not in ['auto', 'http', 'https']:
+            raise ValueError("The value of protocol must be one of ['auto', 'http', 'https']")
         # find protocol
-        self._protocol = self._get_protocol()
-        # load available endpoints
-        self.reload_endpoints()
+        self._protocol = protocol if protocol != 'auto' else self._get_protocol()
+        # load available endpoints (in interactive mode only)
+        if interactive:
+            self.reload_endpoints()
 
     def reload_endpoints(self):
         # remove all services

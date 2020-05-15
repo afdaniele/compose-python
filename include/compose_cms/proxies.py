@@ -6,7 +6,8 @@ from .exceptions import APIError
 
 
 class APINamespace(SimpleNamespace):
-    def __init__(self, **kwargs):
+    def __init__(self, compose, **kwargs):
+        self._compose = compose
         super(APINamespace, self).__init__(**kwargs)
 
     def _has(self, service):
@@ -20,6 +21,15 @@ class APINamespace(SimpleNamespace):
             return ServiceProxy(None, item)
         # ---
         return super(APINamespace, self).__getattr__(item)
+
+    def __call__(self, service, action, args=None):
+        # call API
+        success, data, msg = self._compose._get(service, action, args)
+        # raise if error
+        if not success:
+            raise APIError(msg)
+        # ---
+        return data
 
 
 class ServiceProxy(SimpleNamespace):
