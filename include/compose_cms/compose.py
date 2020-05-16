@@ -1,13 +1,12 @@
 import requests
 
 from .exceptions import APIError
-from .utils import compile_query_string
 from .proxies import ServiceProxy, APINamespace
 
 
 class Compose(object):
 
-    _base_url = "%s://%s/web-api/%s/%s/%s/json?app_id=%s&app_secret=%s&%s"
+    _base_url = "%s://%s/web-api/%s/%s/%s/json"
     _services = []
 
     def __init__(self, host, app_id, app_secret, version='1.0', protocol='auto', interactive=False):
@@ -15,6 +14,11 @@ class Compose(object):
         self._version = version
         self._app_id = app_id
         self._app_secret = app_secret
+        # define standard arguments
+        self._arguments = {
+            'app_id': self._app_id,
+            'app_secret': self._app_secret
+        }
         # create API namespace
         self.api = APINamespace(self)
         # check protocol value
@@ -61,10 +65,11 @@ class Compose(object):
             self._services.append(service_name)
 
     def _get(self, service, action, arguments=None, protocol=None):
-        url = self._build_url(service, action, arguments, protocol)
+        url = self._build_url(service, action, protocol)
         # call the RESTful API
         try:
-            res = requests.get(url).json()
+            args = {**(arguments or {}), **self._arguments}
+            res = requests.get(url, params=args).json()
         except (requests.exceptions.RequestException, ConnectionResetError, ValueError) as err:
             return False, None, str(err)
         # return result
@@ -73,10 +78,9 @@ class Compose(object):
         # ---
         return False, None, res['message']
 
-    def _build_url(self, service, action, arguments=None, protocol=None):
-        return self._base_url % (protocol if protocol else self._protocol, self._hostname,
-                                 self._version, service, action, self._app_id, self._app_secret,
-                                 compile_query_string(arguments) if arguments else '')
+    def _build_url(self, service, action, protocol=None):
+        protocol = protocol or self._protocol
+        return self._base_url % (protocol, self._hostname, self._version, service, action)
 
     def _get_protocol(self):
         for proto in ['https', 'http']:

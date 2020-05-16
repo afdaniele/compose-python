@@ -13,10 +13,6 @@ ARGUMENT_TYPE_TO_PY_TYPE = {
 }
 
 
-def compile_query_string(arguments):
-    return '&'.join(map(lambda e: '%s=%s' % e, arguments.items()))
-
-
 def check_valid_argument_value(param_name, param_info, value):
     param_type = param_info['type']
     param_length = param_info['length'] if 'length' in param_info else None
