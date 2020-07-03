@@ -1,90 +1,229 @@
-import requests
+import os
+import shutil
+import json
+import re
+import glob
 
-from .exceptions import APIError
-from .proxies import ServiceProxy, APINamespace
+
+class Compose:
+
+    def __init__(self, path=None, userdata=None):
+        self._path = path or os.environ.get('COMPOSE_DIR', '/var/www/html/')
+        self._system_dir = os.path.join(self._path, 'public_html', 'system')
+        self._userdata = userdata or os.environ.get('COMPOSE_USERDATA_DIR',
+                                                    os.path.join(self._system_dir, 'user-data'))
+
+    @property
+    def path(self):
+        return self._path
+
+    @property
+    def userdata(self):
+        return self._userdata
+
+    def package(self, name):
+        if len(name.strip()) <= 0:
+            raise ValueError('Invalid package name "{}"'.format(name))
+        paths = [
+            os.path.join(self._path, 'public_html', 'system', 'packages', name),
+            os.path.join(self._userdata, 'packages', name)
+        ]
+        for path in paths:
+            if os.path.isdir(path):
+                return ComposePackage(name, path, self)
+        raise ValueError('Package {} not found'.format(name))
+
+    def database(self, package, database):
+        path = os.path.join(self._userdata, 'databases', package, database)
+        return ComposeDatabase(path, self.package(package))
 
 
-class Compose(object):
+class ComposePackage:
 
-    _base_url = "%s://%s/web-api/%s/%s/%s/json"
-    _services = []
+    def __init__(self, name, path, compose):
+        self._name = name
+        self._path = path
+        self._compose = compose
 
-    def __init__(self, host, app_id, app_secret, version='1.0', protocol='auto', interactive=False):
-        self._hostname = host[:-1] if host[-1] == '/' else host
-        self._version = version
-        self._app_id = app_id
-        self._app_secret = app_secret
-        # define standard arguments
-        self._arguments = {
-            'app_id': self._app_id,
-            'app_secret': self._app_secret
-        }
-        # create API namespace
-        self.api = APINamespace(self)
-        # check protocol value
-        if protocol not in ['auto', 'http', 'https']:
-            raise ValueError("The value of protocol must be one of ['auto', 'http', 'https']")
-        # find protocol
-        self._protocol = protocol if protocol != 'auto' else self._get_protocol()
-        # load available endpoints (in interactive mode only)
-        if interactive:
-            self.reload_endpoints()
+    @property
+    def name(self):
+        return self._name
 
-    def reload_endpoints(self):
-        # remove all services
-        for service_name in self._services:
-            if self.api._has(service_name):
-                delattr(self.api, service_name)
-        # get new endpoints
-        endpoints = self.endpoints()
-        # parse info
-        for endpoint in endpoints:
-            # register service
-            self._register_service(endpoint['service'])
-            # create action proxy
-            getattr(self.api, endpoint['service'])._register_action(endpoint['action'], endpoint)
+    @property
+    def path(self):
+        return self._path
 
-    def endpoints(self):
-        success, data, msg = self._get('api', 'app_info')
-        # ---
-        if success:
-            return data['endpoints']
-        # ---
-        raise APIError('The API cannot be reached!')
+    @property
+    def compose(self):
+        return self._compose
 
-    def is_endpoint_available(self, endpoint):
-        endpoints = self.endpoints()
-        if endpoints is None:
-            return False
-        return endpoint in [e['endpoint'] for e in endpoints]
+    @property
+    def enabled(self):
+        db = self.compose.database('core', 'disabled_packages')
+        return not db.key_exists(self.name)
 
-    def _register_service(self, service_name):
-        # create service proxy if it does not exist
-        if not self.api._has(service_name):
-            setattr(self.api, service_name, ServiceProxy(self, service_name))
-            self._services.append(service_name)
+    def page(self, name):
+        return ComposePage(name, self, self._compose)
 
-    def _get(self, service, action, arguments=None, protocol=None):
-        url = self._build_url(service, action, protocol)
-        # call the RESTful API
-        try:
-            args = {**(arguments or {}), **self._arguments}
-            res = requests.get(url, params=args).json()
-        except (requests.exceptions.RequestException, ConnectionResetError, ValueError) as err:
-            return False, None, str(err)
-        # return result
-        if res['code'] == 200:
-            return True, res['data'], 'OK'
-        # ---
-        return False, None, res['message']
+    def enable(self):
+        db = self.compose.database('core', 'disabled_packages')
+        if db.key_exists(self.name):
+            db.delete(self.name)
 
-    def _build_url(self, service, action, protocol=None):
-        protocol = protocol or self._protocol
-        return self._base_url % (protocol, self._hostname, self._version, service, action)
+    def disable(self):
+        db = self.compose.database('core', 'disabled_packages')
+        db.write(self.name, [])
 
-    def _get_protocol(self):
-        for proto in ['https', 'http']:
-            success, _, _ = self._get('api', 'app_info', protocol=proto)
-            if success:
-                return proto
-        raise APIError('The API cannot be reached!')
+
+class ComposePage:
+
+    def __init__(self, name, package, compose):
+        if len(name.strip()) <= 0:
+            raise ValueError('Invalid page name "{}"'.format(name))
+        self._name = name
+        self._package = package
+        self._compose = compose
+        self._path = os.path.join(self.package.path, 'pages', name)
+        if not os.path.isdir(self._path):
+            raise ValueError('Page {}/{} not found'.format(self._package.name, name))
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def path(self):
+        return self._path
+
+    @property
+    def package(self):
+        return self._package
+
+    @property
+    def compose(self):
+        return self._compose
+
+    @property
+    def enabled(self):
+        db = self.compose.database('core', 'disabled_pages')
+        key = '{}__{}'.format(self.package.name, self.name)
+        return not db.key_exists(key)
+
+    def enable(self):
+        db = self.compose.database('core', 'disabled_pages')
+        key = '{}__{}'.format(self.package.name, self.name)
+        if db.key_exists(key):
+            db.delete(key)
+
+    def disable(self):
+        db = self.compose.database('core', 'disabled_pages')
+        key = '{}__{}'.format(self.package.name, self.name)
+        db.write(key, [])
+
+
+class ComposeDatabase:
+
+    def __init__(self, path, package):
+        self._path = path
+        self._package = package
+
+    @property
+    def path(self):
+        return self._path
+
+    @property
+    def package(self):
+        return self._package
+
+    @property
+    def compose(self):
+        return self._package.compose
+
+    def read(self, key):
+        if self.key_exists(key):
+            raise ValueError('The key {} does not exists'.format(key))
+        db_file = self._key_to_db_file(key)
+        res = json.load(open(db_file, 'rt'))
+        return res['_data']
+
+    def write(self, key, data):
+        if self.key_exists(key):
+            raise ValueError('The key {} does not exists'.format(key))
+        db_file = self._key_to_db_file(key)
+        json.dump({
+            '_data': data,
+            '_metadata': {}
+        },
+            open(db_file, 'wt')
+        )
+
+    def delete(self, key):
+        db_file = self._key_to_db_file(key)
+        os.remove(db_file)
+
+    def key_exists(self, key):
+        db_file = self._key_to_db_file(key)
+        return os.path.isfile(db_file)
+
+    def list_keys(self):
+        db_file_pattern = os.path.join(self._path, '*.json')
+        return list(map(lambda p: os.path.basename(p)[:-5], glob.glob(db_file_pattern)))
+
+    def size(self):
+        return len(self.list_keys())
+
+    def key_size(self, key):
+        db_file = self._key_to_db_file(key)
+        return os.path.getsize(db_file)
+
+    def is_writable(self, key):
+        db_file = self._key_to_db_file(key)
+        with open(db_file, "a") as fout:
+            return fout.writable()
+
+    @staticmethod
+    def database_exists(package, database, userdata=None):
+        db_dir = ComposeDatabase._sget_db_dir(package, database, userdata)
+        return os.path.isdir(db_dir)
+
+    @staticmethod
+    def list_dbs(package, userdata=None):
+        db_dir_pattern = ComposeDatabase._sget_db_dir(package, '*', userdata)
+        return list(map(lambda p: os.path.basename(p), glob.glob(db_dir_pattern)))
+
+    @staticmethod
+    def delete_db(package, database, userdata=None):
+        db_dir = ComposeDatabase._sget_db_dir(package, database, userdata)
+        shutil.rmtree(db_dir)
+
+    def _get_db_dir(self, database):
+        return os.path.join(self.path, database)
+
+    @staticmethod
+    def _sget_db_dir(package, database, userdata=None):
+        userdata = userdata or os.environ.get('COMPOSE_USERDATA_DIR', '/user-data')
+        return os.path.join(userdata, 'databases', package, database)
+
+    @staticmethod
+    def _safe_key(key):
+        return Utils.string_to_valid_filename(key)
+
+    def _key_to_db_file(self, key):
+        key = self._safe_key(key)
+        return os.path.join(self._path, key + '.json')
+
+
+class Utils:
+
+    @staticmethod
+    def string_to_valid_filename(s: str):
+        # lowercase
+        s = s.lower()
+        # replace more than one space to underscore
+        s = re.sub(' +', '_', s)
+        # convert any single space to underscrore
+        s = s.replace(' ', '_')
+        # remove non alpha numeric characters
+        s = re.sub('[^A-Za-z0-9_]', '', s)
+        # return sanitized string
+        return s
