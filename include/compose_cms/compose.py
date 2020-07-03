@@ -222,6 +222,8 @@ class ComposeDatabase:
 
     def write(self, key, data):
         db_file = self._key_to_db_file(key)
+        db_dir = os.path.dirname(db_file)
+        os.makedirs(db_dir, 0o775, exist_ok=True)
         json.dump(
             {
                 '_data': data,
