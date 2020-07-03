@@ -162,8 +162,10 @@ class ComposePackageConfiguration:
     def metadata(self):
         return copy.deepcopy(self._metadata)
 
-    def configuration(self):
+    def configuration(self, default=None):
         db = self._db()
+        if default is not None and not db.key_exists('content'):
+            return default
         return db.read('content')
 
     def _metadata(self):
@@ -184,7 +186,7 @@ class ComposePackageConfiguration:
         if key not in self._metadata:
             raise KeyError('Package {} has no configuration key {}'.format(self.package.name, key))
         param_type = self._metadata[key]['type']
-        config = self.configuration()
+        config = self.configuration({})
         pclass = compose_type_to_python_type(param_type, default=str)
         config[key] = pclass(value)
         db = self._db()
