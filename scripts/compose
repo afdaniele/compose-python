@@ -10,26 +10,49 @@ class NotNone:
     pass
 
 
-def _package(args, compose):
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--package', help='Package ID', required=True)
+class Usage:
+
+    def __init__(self, name):
+        self.usage = [name]
+
+    def __call__(self, *args, **kwargs):
+        self.usage.extend(args)
+        return self
+
+    def __str__(self):
+        return ' '.join(self.usage)
+
+
+def _package(usage, args, compose):
+    parser = argparse.ArgumentParser(usage=str(usage('--package <package>')))
+    parser.add_argument(
+        '--package',
+        help='Package ID',
+        choices=compose.packages,
+        required=True
+    )
     parsed, remaining = parser.parse_known_args(args=args)
     # ---
     return compose.package(parsed.package), remaining
 
 
-def _page(args, compose):
-    parser = argparse.ArgumentParser()
-    package, _ = _package(args, compose)
-    parser.add_argument('--page', help='Page ID', required=True)
+def _page(usage, args, compose):
+    package, _ = _package(usage, args, compose)
+    parser = argparse.ArgumentParser(usage=str(usage('--page <page>')))
+    parser.add_argument(
+        '--page',
+        help='Page ID',
+        choices=package.pages,
+        required=True
+    )
     parsed, remaining = parser.parse_known_args(args=args)
     # ---
     return package.page(parsed.page), remaining
 
 
-def _configuration(args, compose):
-    parser = argparse.ArgumentParser()
-    package, args = _package(args, compose)
+def _configuration(usage, args, compose):
+    parser = argparse.ArgumentParser(usage=str(usage))
+    package, args = _package(usage, args, compose)
     configuration = package.configuration()
     for key, info in configuration.metadata.items():
         ptype = compose_type_to_python_type(info['type'])
@@ -45,38 +68,38 @@ def _configuration(args, compose):
     return given, []
 
 
-def package_enable(args, compose):
-    package, _ = _package(args, compose)
+def package_enable(usage, args, compose):
+    package, _ = _package(usage, args, compose)
     package.enable()
 
 
-def package_disable(args, compose):
-    package, _ = _package(args, compose)
+def package_disable(usage, args, compose):
+    package, _ = _package(usage, args, compose)
     package.disable()
 
 
-def page_enable(args, compose):
-    page, _ = _page(args, compose)
+def page_enable(usage, args, compose):
+    page, _ = _page(usage, args, compose)
     page.enable()
 
 
-def page_disable(args, compose):
-    page, _ = _page(args, compose)
+def page_disable(usage, args, compose):
+    page, _ = _page(usage, args, compose)
     page.disable()
 
 
-def configuration_get(args, compose):
-    package, _ = _package(args, compose)
-    keys, _ = _configuration(args, compose)
+def configuration_get(usage, args, compose):
+    package, _ = _package(usage, args, compose)
+    keys, _ = _configuration(usage, args, compose)
     configuration = package.configuration()
     for key in keys:
         value = configuration.get(key)
         print('{}={}'.format(key, str(value)))
 
 
-def configuration_set(args, compose):
-    package, _ = _package(args, compose)
-    cfg, _ = _configuration(args, compose)
+def configuration_set(usage, args, compose):
+    package, _ = _package(usage, args, compose)
+    cfg, _ = _configuration(usage, args, compose)
     configuration = package.configuration()
     for key, value in cfg.items():
         configuration.set(key, value)
@@ -93,7 +116,8 @@ SUPPORTED_ACTIONS = {
 
 
 if __name__ == '__main__':
-    _parser = argparse.ArgumentParser()
+    _usage = Usage('compose')
+    _parser = argparse.ArgumentParser(usage=str(_usage))
     # ---
     _parser.add_argument('--action', '-a',
                          choices=SUPPORTED_ACTIONS.keys(),
@@ -108,4 +132,4 @@ if __name__ == '__main__':
     _parsed, _remaining = _parser.parse_known_args()
     # execute action
     _compose = Compose(path=_parsed.workspace, userdata=_parsed.userdata)
-    SUPPORTED_ACTIONS[_parsed.action](_remaining, _compose)
+    SUPPORTED_ACTIONS[_parsed.action](_usage, _remaining, _compose)

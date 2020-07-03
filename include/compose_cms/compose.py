@@ -24,6 +24,17 @@ class Compose:
     def userdata(self):
         return self._userdata
 
+    @property
+    def packages(self):
+        packages = []
+        paths = [
+            os.path.join(self._path, 'public_html', 'system', 'packages', '*'),
+            os.path.join(self._userdata, 'packages', '*')
+        ]
+        for path in paths:
+            packages.extend([os.path.basename(p) for p in glob.glob(path) if os.path.isdir(p)])
+        return packages
+
     def package(self, name):
         if len(name.strip()) <= 0:
             raise ValueError('Invalid package name "{}"'.format(name))
@@ -64,6 +75,11 @@ class ComposePackage:
     def enabled(self):
         db = self.compose.database('core', 'disabled_packages')
         return not db.key_exists(self.name)
+
+    @property
+    def pages(self):
+        page_dir_pattern = os.path.join(self.path, 'pages', '*')
+        return [os.path.basename(p) for p in glob.glob(page_dir_pattern) if os.path.isdir(p)]
 
     def page(self, name):
         return ComposePage(name, self)
