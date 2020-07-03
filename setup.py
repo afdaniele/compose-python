@@ -2,7 +2,7 @@ import os
 from setuptools import setup, find_packages
 
 # :==> Fill in your project data here
-version = '0.1.11'
+version = '0.1.12'
 library_name = 'compose_cms'
 library_webpage = 'https://github.com/afdaniele/compose-python'
 maintainer = 'Andrea F. Daniele'
