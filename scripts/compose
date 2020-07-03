@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+
+import argparse
+
+from compose_cms import Compose
+
+
+def _package(parser, compose):
+    parser.add_argument('--package', help='Package ID', required=True)
+    parsed, _ = parser.parse_known_args()
+    # ---
+    return compose.package(parsed.package)
+
+
+def _page(parser, compose):
+    package = _package(parser, compose)
+    parser.add_argument('--page', help='Page ID', required=True)
+    parsed, _ = parser.parse_known_args()
+    # ---
+    return package.page(parsed.page)
+
+
+def package_enable(parser, compose):
+    package = _package(parser, compose)
+    package.enable()
+
+
+def package_disable(parser, compose):
+    package = _package(parser, compose)
+    package.disable()
+
+
+def page_enable(parser, compose):
+    page = _page(parser, compose)
+    page.enable()
+
+
+def page_disable(parser, compose):
+    page = _page(parser, compose)
+    page.disable()
+
+
+SUPPORTED_ACTIONS = {
+    'package/enable': package_enable,
+    'package/disable': package_disable,
+    'page/enable': page_enable,
+    'page/disable': page_disable,
+}
+
+
+if __name__ == '__main__':
+    _parser = argparse.ArgumentParser()
+    # ---
+    _parser.add_argument('--action', '-a',
+                         choices=SUPPORTED_ACTIONS.keys(),
+                         required=True,
+                         help='Action to perform')
+    _parser.add_argument('--workspace', '-C',
+                         default=None,
+                         help='Directory where \\compose\\ is installed')
+    _parser.add_argument('--userdata', '-U',
+                         default=None,
+                         help='Directory containing the user-data')
+    _parsed, _ = _parser.parse_known_args()
+    # execute action
+    _compose = Compose(path=_parsed.workspace, userdata=_parsed.userdata)
+    SUPPORTED_ACTIONS[_parsed.action](argparse.ArgumentParser(), _compose)

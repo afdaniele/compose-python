@@ -38,6 +38,7 @@ setup(name=library_name,
       install_requires=dependencies,
       package_dir={"": "include"},
       packages=find_packages('./include'),
+      scripts=['scripts/compose'],
       long_description=description,
       version=version,
       include_package_data=True)
