@@ -55,7 +55,7 @@ def _configuration(usage, args, compose):
     package, args = _package(usage, args, compose)
     configuration = package.configuration()
     for key, info in configuration.metadata.items():
-        ptype = compose_type_to_python_type(info['type'])
+        ptype = compose_type_to_python_type(info['type'], default=str)
         parser.add_argument(
             '--{}'.format(key),
             type=ptype,

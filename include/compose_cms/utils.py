@@ -13,9 +13,11 @@ ARGUMENT_TYPE_TO_PY_TYPE = {
 }
 
 
-def compose_type_to_python_type(compose_type):
+def compose_type_to_python_type(compose_type, default=None):
     if compose_type not in ARGUMENT_TYPE_TO_PY_TYPE:
-        raise ValueError('Compose type {} not recognized'.format(compose_type))
+        if default is None:
+            raise ValueError('Compose type {} not recognized'.format(compose_type))
+        return default
     pclass, _, _ = ARGUMENT_TYPE_TO_PY_TYPE[compose_type]
     return pclass
 
