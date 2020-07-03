@@ -5,7 +5,7 @@ import re
 import copy
 import glob
 
-from compose_cms.utils import ARGUMENT_TYPE_TO_PY_TYPE
+from compose_cms.utils import compose_type_to_python_type
 
 
 class Compose:
@@ -185,7 +185,7 @@ class ComposePackageConfiguration:
             raise KeyError('Package {} has no configuration key {}'.format(self.package.name, key))
         param_type = self._metadata[key]['type']
         config = self.configuration()
-        pclass, _, _ = ARGUMENT_TYPE_TO_PY_TYPE[param_type]
+        pclass = compose_type_to_python_type(param_type, default=str)
         config[key] = pclass(value)
         db = self._db()
         db.write('content', config)

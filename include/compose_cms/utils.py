@@ -19,6 +19,8 @@ def compose_type_to_python_type(compose_type, default=None):
             raise ValueError('Compose type {} not recognized'.format(compose_type))
         return default
     pclass, _, _ = ARGUMENT_TYPE_TO_PY_TYPE[compose_type]
+    if pclass == object:
+        return str
     return pclass
 
 
