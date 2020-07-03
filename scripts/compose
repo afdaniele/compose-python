@@ -102,6 +102,8 @@ def configuration_set(usage, args, compose):
     cfg, _ = _configuration(usage, args, compose)
     configuration = package.configuration()
     for key, value in cfg.items():
+        if value == NotNone:
+            continue
         configuration.set(key, value)
 
 
@@ -119,17 +121,18 @@ if __name__ == '__main__':
     _usage = Usage('compose')
     _parser = argparse.ArgumentParser(usage=str(_usage))
     # ---
-    _parser.add_argument('--action', '-a',
-                         choices=SUPPORTED_ACTIONS.keys(),
-                         required=True,
-                         help='Action to perform')
     _parser.add_argument('--workspace', '-C',
                          default=None,
                          help='Directory where \\compose\\ is installed')
     _parser.add_argument('--userdata', '-U',
                          default=None,
                          help='Directory containing the user-data')
+    _parser.add_argument('action',
+                         nargs=1,
+                         choices=SUPPORTED_ACTIONS.keys(),
+                         help='Action to perform')
     _parsed, _remaining = _parser.parse_known_args()
     # execute action
+    _action = _parsed.action[0]
     _compose = Compose(path=_parsed.workspace, userdata=_parsed.userdata)
-    SUPPORTED_ACTIONS[_parsed.action](_usage, _remaining, _compose)
+    SUPPORTED_ACTIONS[_action](_usage, _remaining, _compose)
