@@ -3,41 +3,83 @@
 import argparse
 
 from compose_cms import Compose
+from compose_cms.utils import compose_type_to_python_type
 
 
-def _package(parser, compose):
+class NotNone:
+    pass
+
+
+def _package(args, compose):
+    parser = argparse.ArgumentParser()
     parser.add_argument('--package', help='Package ID', required=True)
-    parsed, _ = parser.parse_known_args()
+    parsed, remaining = parser.parse_known_args(args=args)
     # ---
-    return compose.package(parsed.package)
+    return compose.package(parsed.package), remaining
 
 
-def _page(parser, compose):
-    package = _package(parser, compose)
+def _page(args, compose):
+    parser = argparse.ArgumentParser()
+    package, _ = _package(args, compose)
     parser.add_argument('--page', help='Page ID', required=True)
-    parsed, _ = parser.parse_known_args()
+    parsed, remaining = parser.parse_known_args(args=args)
     # ---
-    return package.page(parsed.page)
+    return package.page(parsed.page), remaining
 
 
-def package_enable(parser, compose):
-    package = _package(parser, compose)
+def _configuration(args, compose):
+    parser = argparse.ArgumentParser()
+    package, args = _package(args, compose)
+    configuration = package.configuration()
+    for key, info in configuration.metadata.items():
+        ptype = compose_type_to_python_type(info['type'])
+        parser.add_argument(
+            '--{}'.format(key),
+            type=ptype,
+            const=NotNone,
+            nargs='?',
+            help=info['details']
+        )
+    parsed = parser.parse_args(args=args)
+    given = {k: v for k, v in vars(parsed).items() if v is not None}
+    return given, []
+
+
+def package_enable(args, compose):
+    package, _ = _package(args, compose)
     package.enable()
 
 
-def package_disable(parser, compose):
-    package = _package(parser, compose)
+def package_disable(args, compose):
+    package, _ = _package(args, compose)
     package.disable()
 
 
-def page_enable(parser, compose):
-    page = _page(parser, compose)
+def page_enable(args, compose):
+    page, _ = _page(args, compose)
     page.enable()
 
 
-def page_disable(parser, compose):
-    page = _page(parser, compose)
+def page_disable(args, compose):
+    page, _ = _page(args, compose)
     page.disable()
+
+
+def configuration_get(args, compose):
+    package, _ = _package(args, compose)
+    keys, _ = _configuration(args, compose)
+    configuration = package.configuration()
+    for key in keys:
+        value = configuration.get(key)
+        print('{}={}'.format(key, str(value)))
+
+
+def configuration_set(args, compose):
+    package, _ = _package(args, compose)
+    cfg, _ = _configuration(args, compose)
+    configuration = package.configuration()
+    for key, value in cfg.items():
+        configuration.set(key, value)
 
 
 SUPPORTED_ACTIONS = {
@@ -45,6 +87,8 @@ SUPPORTED_ACTIONS = {
     'package/disable': package_disable,
     'page/enable': page_enable,
     'page/disable': page_disable,
+    'configuration/get': configuration_get,
+    'configuration/set': configuration_set,
 }
 
 
@@ -61,7 +105,7 @@ if __name__ == '__main__':
     _parser.add_argument('--userdata', '-U',
                          default=None,
                          help='Directory containing the user-data')
-    _parsed, _ = _parser.parse_known_args()
+    _parsed, _remaining = _parser.parse_known_args()
     # execute action
     _compose = Compose(path=_parsed.workspace, userdata=_parsed.userdata)
-    SUPPORTED_ACTIONS[_parsed.action](argparse.ArgumentParser(), _compose)
+    SUPPORTED_ACTIONS[_parsed.action](_remaining, _compose)

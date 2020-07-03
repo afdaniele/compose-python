@@ -2,7 +2,10 @@ import os
 import shutil
 import json
 import re
+import copy
 import glob
+
+from compose_cms.utils import ARGUMENT_TYPE_TO_PY_TYPE
 
 
 class Compose:
@@ -63,7 +66,10 @@ class ComposePackage:
         return not db.key_exists(self.name)
 
     def page(self, name):
-        return ComposePage(name, self, self._compose)
+        return ComposePage(name, self)
+
+    def configuration(self):
+        return ComposePackageConfiguration(self)
 
     def enable(self):
         db = self.compose.database('core', 'disabled_packages')
@@ -77,12 +83,12 @@ class ComposePackage:
 
 class ComposePage:
 
-    def __init__(self, name, package, compose):
+    def __init__(self, name, package):
         if len(name.strip()) <= 0:
             raise ValueError('Invalid page name "{}"'.format(name))
         self._name = name
         self._package = package
-        self._compose = compose
+        self._compose = self._package.compose
         self._path = os.path.join(self.package.path, 'pages', name)
         if not os.path.isdir(self._path):
             raise ValueError('Page {}/{} not found'.format(self._package.name, name))
@@ -121,6 +127,57 @@ class ComposePage:
         db.write(key, [])
 
 
+class ComposePackageConfiguration:
+
+    def __init__(self, package):
+        self._package = package
+        self._compose = self._package.compose
+        self._metadata = self._metadata()
+
+    @property
+    def package(self):
+        return self._package
+
+    @property
+    def compose(self):
+        return self._compose
+
+    @property
+    def metadata(self):
+        return copy.deepcopy(self._metadata)
+
+    def configuration(self):
+        db = self._db()
+        return db.read('content')
+
+    def _metadata(self):
+        metadata_filepath = os.path.join(self.package.path, 'configuration', 'metadata.json')
+        if not os.path.isfile(metadata_filepath):
+            raise ValueError('Configuration metadata file not found. '
+                             'The package is not configurable')
+        metadata = json.load(open(metadata_filepath, 'rt'))
+        return metadata['configuration_content']
+
+    def get(self, key):
+        if key not in self._metadata:
+            raise KeyError('Package {} has no configuration key {}'.format(self.package.name, key))
+        config = self.configuration()
+        return config[key] if key in config else self._metadata[key]
+
+    def set(self, key, value):
+        if key not in self._metadata:
+            raise KeyError('Package {} has no configuration key {}'.format(self.package.name, key))
+        param_type = self._metadata[key]['type']
+        config = self.configuration()
+        pclass, _, _ = ARGUMENT_TYPE_TO_PY_TYPE[param_type]
+        config[key] = pclass(value)
+        db = self._db()
+        db.write('content', config)
+
+    def _db(self):
+        return self.compose.database(self.package.name, '__configuration__')
+
+
 class ComposeDatabase:
 
     def __init__(self, path, package):
@@ -140,24 +197,25 @@ class ComposeDatabase:
         return self._package.compose
 
     def read(self, key):
-        if self.key_exists(key):
-            raise ValueError('The key {} does not exists'.format(key))
+        self._key_exists_or_error(key)
         db_file = self._key_to_db_file(key)
         res = json.load(open(db_file, 'rt'))
         return res['_data']
 
     def write(self, key, data):
-        if self.key_exists(key):
-            raise ValueError('The key {} does not exists'.format(key))
         db_file = self._key_to_db_file(key)
-        json.dump({
-            '_data': data,
-            '_metadata': {}
-        },
-            open(db_file, 'wt')
+        json.dump(
+            {
+                '_data': data,
+                '_metadata': {}
+            },
+            open(db_file, 'wt'),
+            sort_keys=True,
+            indent=4
         )
 
     def delete(self, key):
+        self._key_exists_or_error(key)
         db_file = self._key_to_db_file(key)
         os.remove(db_file)
 
@@ -173,6 +231,7 @@ class ComposeDatabase:
         return len(self.list_keys())
 
     def key_size(self, key):
+        self._key_exists_or_error(key)
         db_file = self._key_to_db_file(key)
         return os.path.getsize(db_file)
 
@@ -211,6 +270,10 @@ class ComposeDatabase:
     def _key_to_db_file(self, key):
         key = self._safe_key(key)
         return os.path.join(self._path, key + '.json')
+
+    def _key_exists_or_error(self, key):
+        if not self.key_exists(key):
+            raise ValueError('The key {} does not exists'.format(key))
 
 
 class Utils:

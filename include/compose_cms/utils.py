@@ -13,6 +13,13 @@ ARGUMENT_TYPE_TO_PY_TYPE = {
 }
 
 
+def compose_type_to_python_type(compose_type):
+    if compose_type not in ARGUMENT_TYPE_TO_PY_TYPE:
+        raise ValueError('Compose type {} not recognized'.format(compose_type))
+    pclass, _, _ = ARGUMENT_TYPE_TO_PY_TYPE[compose_type]
+    return pclass
+
+
 def check_valid_argument_value(param_name, param_info, value):
     param_type = param_info['type']
     param_length = param_info['length'] if 'length' in param_info else None
