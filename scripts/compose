@@ -52,7 +52,6 @@ def _page(usage, args, compose):
 
 def _configuration(usage, args, compose, action):
     parser = argparse.ArgumentParser(usage=str(usage))
-    package, args = _package(usage, args, compose)
     parser.add_argument(
         'configuration',
         type=str,
@@ -69,6 +68,15 @@ def _configuration(usage, args, compose, action):
         config[k] = v
     # ---
     return config, []
+
+
+def _theme_db(compose):
+    package = compose.package('core')
+    configuration = package.configuration()
+    theme_pkg, theme_name = configuration.get('theme').split(':')
+    db = compose.database('core', 'theme_configuration')
+    key = '{}__{}'.format(theme_pkg, theme_name)
+    return db, key
 
 
 def package_enable(usage, args, compose):
@@ -110,6 +118,24 @@ def configuration_set(usage, args, compose):
         configuration.set(key, value)
 
 
+def theme_get(usage, args, compose):
+    keys, _ = _configuration(usage, args, compose, 'get')
+    db, cfg_key = _theme_db(compose)
+    entry = db.read(cfg_key)
+    for key in keys:
+        value = entry[key]
+        print('{}={}'.format(key, str(value)))
+
+
+def theme_set(usage, args, compose):
+    kv, _ = _configuration(usage, args, compose, 'set')
+    db, cfg_key = _theme_db(compose)
+    entry = db.read(cfg_key)
+    for key, value in kv.items():
+        entry[key] = value
+    db.write(cfg_key, entry)
+
+
 SUPPORTED_ACTIONS = {
     'package/enable': package_enable,
     'package/disable': package_disable,
@@ -117,6 +143,8 @@ SUPPORTED_ACTIONS = {
     'page/disable': page_disable,
     'configuration/get': configuration_get,
     'configuration/set': configuration_set,
+    'theme/get': theme_get,
+    'theme/set': theme_set,
 }
 
 

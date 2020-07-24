@@ -238,7 +238,7 @@ class ComposeDatabase:
         self._key_exists_or_error(key)
         db_file = self._key_to_db_file(key)
         res = json.load(open(db_file, 'rt'))
-        return res['_data']
+        return ComposeObject(res['_data'])
 
     def write(self, key, data):
         db_file = self._key_to_db_file(key)
