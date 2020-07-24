@@ -58,7 +58,7 @@ def _configuration(usage, args, compose, action):
         nargs='+',
         help='Configuration in key1[=val1] [key2[=val2] ...] format.'
     )
-    parsed = parser.parse_args(args=args)
+    parsed, _ = parser.parse_known_args(args=args)
     config = {}
     # check syntax
     for kv in parsed.configuration:
@@ -100,7 +100,7 @@ def page_disable(usage, args, compose):
 
 
 def configuration_get(usage, args, compose):
-    package, _ = _package(usage, args, compose)
+    package, args = _package(usage, args, compose)
     keys, _ = _configuration(usage, args, compose, 'get')
     configuration = package.configuration()
     for key in keys:
@@ -109,7 +109,7 @@ def configuration_get(usage, args, compose):
 
 
 def configuration_set(usage, args, compose):
-    package, _ = _package(usage, args, compose)
+    package, args = _package(usage, args, compose)
     cfg, _ = _configuration(usage, args, compose, 'set')
     configuration = package.configuration()
     for key, value in cfg.items():
