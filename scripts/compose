@@ -3,7 +3,7 @@
 import argparse
 
 from compose_cms import Compose
-from compose_cms.utils import compose_type_to_python_type
+from compose_cms.utils import ComposeObject
 
 
 class NotNone:
@@ -130,7 +130,7 @@ def theme_get(usage, args, compose):
 def theme_set(usage, args, compose):
     kv, _ = _configuration(usage, args, compose, 'set')
     db, cfg_key = _theme_db(compose)
-    entry = db.read(cfg_key)
+    entry = db.read(cfg_key) if db.key_exists(cfg_key) else ComposeObject()
     for key, value in kv.items():
         entry[key] = value
     db.write(cfg_key, entry)
