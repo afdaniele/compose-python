@@ -5,7 +5,11 @@ import re
 import copy
 import glob
 
-from compose_cms.utils import compose_type_to_python_type
+from compose_cms.utils import compose_type_to_python_type, ComposeObject, ComposeSchema
+
+
+class __NOTFOUND__:
+    pass
 
 
 class Compose:
@@ -148,7 +152,7 @@ class ComposePackageConfiguration:
     def __init__(self, package):
         self._package = package
         self._compose = self._package.compose
-        self._metadata = self._metadata()
+        self._schema = self._get_schema()
 
     @property
     def package(self):
@@ -159,38 +163,54 @@ class ComposePackageConfiguration:
         return self._compose
 
     @property
-    def metadata(self):
-        return copy.deepcopy(self._metadata)
+    def schema(self):
+        return copy.deepcopy(self._schema.as_dict())
 
     def configuration(self, default=None):
         db = self._db()
         if default is not None and not db.key_exists('content'):
             return default
-        return db.read('content')
+        return ComposeObject(db.read('content'))
 
-    def _metadata(self):
-        metadata_filepath = os.path.join(self.package.path, 'configuration', 'metadata.json')
-        if not os.path.isfile(metadata_filepath):
-            raise ValueError('Configuration metadata file not found. '
+    def _get_schema(self):
+        schema_filepath = os.path.join(self.package.path, 'configuration', 'schema.json')
+        if not os.path.isfile(schema_filepath):
+            raise ValueError('Configuration schema file not found. '
                              'The package is not configurable')
-        metadata = json.load(open(metadata_filepath, 'rt'))
-        return metadata['configuration_content']
+        schema = json.load(open(schema_filepath, 'rt'))
+        return ComposeSchema(schema)
 
     def get(self, key):
-        if key not in self._metadata:
-            raise KeyError('Package {} has no configuration key {}'.format(self.package.name, key))
         config = self.configuration()
-        return config[key] if key in config else self._metadata[key]
+        # get the default value
+        try:
+            default = self._schema['{}.default'.format(key)]
+        except KeyError:
+            raise KeyError('Package {} has no configuration key {}'.format(self.package.name, key))
+        # try to get the custom value
+        try:
+            value = config[key]
+            return value
+        except KeyError:
+            pass
+        # ---
+        return default
 
     def set(self, key, value):
-        if key not in self._metadata:
+        # get the parameter type
+        try:
+            param_type = self._schema['{}.type'.format(key)]
+        except KeyError:
             raise KeyError('Package {} has no configuration key {}'.format(self.package.name, key))
-        param_type = self._metadata[key]['type']
-        config = self.configuration({})
+        # get current configuration
+        config = self.configuration(ComposeObject())
+        # format the value according to its type
         pclass = compose_type_to_python_type(param_type, default=str)
-        config[key] = pclass(value)
+        value = pclass(value)
+        # write new value to the DB
+        config[key] = value
         db = self._db()
-        db.write('content', config)
+        db.write('content', config.as_dict())
 
     def _db(self):
         return self.compose.database(self.package.name, '__configuration__')

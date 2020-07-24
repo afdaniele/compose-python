@@ -54,3 +54,63 @@ def check_valid_argument_value(param_name, param_info, value):
         raise ValueError(
             "Value for API argument '{}' of type '{}' is expected to be one of {}".format(
                 param_name, param_type, str(param_values)))
+
+
+class ComposeObject(dict):
+
+    def _cursor_(self, item, create=False):
+        ns = item.lstrip('/').split('/')
+        res = self
+        for cur in ns[:-1]:
+            if isinstance(res, dict) and cur not in res:
+                if create:
+                    res[cur] = dict()
+                else:
+                    raise KeyError('Key not found: {}'.format(item))
+            if isinstance(res, list):
+                if (int(cur) < 0 or int(cur) > len(res)) or (int(cur) == len(res) and not create):
+                    raise KeyError('Index {} out of range for list of {} elements'.format(
+                        item, len(res)))
+                if create:
+                    res.append(dict())
+            res = self._type_(res).__getitem__(res, cur)
+        if isinstance(res, dict) and ns[-1] not in res and not create:
+            raise KeyError('Key not found: {}'.format(item))
+        return res, ns[-1]
+
+    def __getitem__(self, item):
+        cursor, tip = self._cursor_(item)
+        return self._type_(cursor).__getitem__(cursor, tip)
+
+    def __setitem__(self, key, value):
+        cursor, tip = self._cursor_(key, create=True)
+        return self._type_(cursor).__setitem__(cursor, tip, value)
+
+    def as_dict(self):
+        return dict(self.items())
+
+    @staticmethod
+    def _type_(item):
+        if isinstance(item, dict):
+            return dict
+        if isinstance(item, list):
+            return list
+        return type(item)
+
+
+class ComposeSchema(ComposeObject):
+
+    def __getitem__(self, item: str):
+        key = self._key_(item)
+        return super(ComposeSchema, self).__getitem__(key)
+
+    def __setitem__(self, key, value):
+        key = self._key_(key)
+        return super(ComposeSchema, self).__setitem__(key, value)
+
+    @staticmethod
+    def _key_(key):
+        key = '/' + key.lstrip('/')
+        key = key.replace('/', '/_data/')
+        key = key.replace('.', '/')
+        return key

@@ -50,22 +50,25 @@ def _page(usage, args, compose):
     return package.page(parsed.page), remaining
 
 
-def _configuration(usage, args, compose):
+def _configuration(usage, args, compose, action):
     parser = argparse.ArgumentParser(usage=str(usage))
     package, args = _package(usage, args, compose)
-    configuration = package.configuration()
-    for key, info in configuration.metadata.items():
-        ptype = compose_type_to_python_type(info['type'], default=str)
-        parser.add_argument(
-            '--{}'.format(key),
-            type=ptype,
-            const=NotNone,
-            nargs='?',
-            help=info['details']
-        )
+    parser.add_argument(
+        'configuration',
+        type=str,
+        nargs='+',
+        help='Configuration in key1[=val1] [key2[=val2] ...] format.'
+    )
     parsed = parser.parse_args(args=args)
-    given = {k: v for k, v in vars(parsed).items() if v is not None}
-    return given, []
+    config = {}
+    # check syntax
+    for kv in parsed.configuration:
+        k, v, *rest = (kv.split('=') + [None]) if action == 'set' else [kv, None]
+        if action == 'set' and (v is None or len(rest) > 1):
+            raise ValueError('Configuration must be passed using the syntax key=val.')
+        config[k] = v
+    # ---
+    return config, []
 
 
 def package_enable(usage, args, compose):
@@ -90,7 +93,7 @@ def page_disable(usage, args, compose):
 
 def configuration_get(usage, args, compose):
     package, _ = _package(usage, args, compose)
-    keys, _ = _configuration(usage, args, compose)
+    keys, _ = _configuration(usage, args, compose, 'get')
     configuration = package.configuration()
     for key in keys:
         value = configuration.get(key)
@@ -99,7 +102,7 @@ def configuration_get(usage, args, compose):
 
 def configuration_set(usage, args, compose):
     package, _ = _package(usage, args, compose)
-    cfg, _ = _configuration(usage, args, compose)
+    cfg, _ = _configuration(usage, args, compose, 'set')
     configuration = package.configuration()
     for key, value in cfg.items():
         if value == NotNone:
