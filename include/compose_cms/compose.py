@@ -244,15 +244,16 @@ class ComposeDatabase:
         db_file = self._key_to_db_file(key)
         db_dir = os.path.dirname(db_file)
         os.makedirs(db_dir, 0o775, exist_ok=True)
-        json.dump(
+        json_str = json.dumps(
             {
                 '_data': data,
                 '_metadata': {}
             },
-            open(db_file, 'wt'),
             sort_keys=True,
             indent=4
         )
+        with open(db_file, 'wt') as fout:
+            fout.write(json_str)
 
     def delete(self, key):
         self._key_exists_or_error(key)

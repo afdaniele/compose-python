@@ -1,5 +1,28 @@
 import re
 
+
+class StrongBool:
+
+    def __init__(self, v):
+        if isinstance(v, bool):
+            self._v = v
+        elif isinstance(v, str):
+            if v.lower() in ["true", "1", "yes"]:
+                self._v = True
+            elif v.lower() in ["false", "0", "no"]:
+                self._v = False
+            else:
+                raise ValueError("Value '{}' cannot be interpreted as boolean".format(v))
+        else:
+            raise ValueError("Value of type '{}' cannot be interpreted as boolean".format(str(type(v))))
+
+    def __bool__(self):
+        return self._v
+
+    def toJSON(self):
+        return self._v
+
+
 ARGUMENT_TYPE_TO_PY_TYPE = {
     'text': (str, lambda s: True, 'Free text. Can contain letters, numbers, symbols, etc..'),
     'alphabetic': (str, lambda s: re.match('[a-zA-Z]+', s) is not None,
@@ -8,7 +31,7 @@ ARGUMENT_TYPE_TO_PY_TYPE = {
                      'Alphanumeric string. Can contain letters and numbers.'),
     'numeric': (int, lambda v: v >= 0, 'A positive integer'),
     'float': (float, lambda v: True, 'A floating-point number'),
-    'boolean': (bool, lambda v: True, 'Boolean values'),
+    'boolean': (StrongBool, lambda v: True, 'Boolean values'),
     'enum': (object, lambda v: True, 'Enum values')
 }
 
